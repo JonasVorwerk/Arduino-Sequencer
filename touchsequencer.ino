@@ -17,6 +17,14 @@ guaranteed hours of pleasure!
 
 05-08-2019
 https://jonasvorwerk.nl
+
+Changes:
+
+09-08-2019
+- Now posible to change instuments using the INSTR button
+- Change Sequencer size
+- Separate midi channel for each track
+
 */
 
 #include <SPI.h>
@@ -106,16 +114,25 @@ Adafruit_STMPE610 ts = Adafruit_STMPE610(STMPE_CS);
   #define VS1053_MIDI Serial
 #endif
 
-//SEQUENCER
+//SEQUENCER LARGE
 #define COLS 16
 #define ROWS 10
 #define BOXSIZE 20
 #define BPMDIVIDER 4
+
+//SEQUENCER SMALL
+//#define COLS 8
+//#define ROWS 5
+//#define BOXSIZE 0
+//#define BPMDIVIDER 2
+
+#define DEBUG 0
 #define COLOR 0xFFFF
 #define BGCOLOR 0x0000
 #define TOUCHDELAY 150
 
 bool power = true;
+bool instrMode = false;
 int bpm = 100;
 uint8_t curstep = 0; 
 
@@ -124,7 +141,7 @@ typedef struct trackstructure{
   bool pattern[COLS];
 };
 
-trackstructure track[ROWS+1];
+trackstructure track[ROWS+1]; //one extra
 
 //SEQUENCER timer
 long previousMillis = 0;
@@ -147,36 +164,30 @@ void setup(void) {
 
   //enable midi
   VS1053_MIDI.begin(31250); // MIDI uses a 'strange baud rate'
-  midiSetChannelBank(0, VS1053_BANK_DRUMS1);
-  midiSetChannelVolume(0, 127);
-  midiSetInstrument(0, 5);
+  delay(100);
+  
+  //separate midi channel for each track
+  for (uint8_t r = 0; r < ROWS; r++) {
+    midiSetChannelBank(r, VS1053_BANK_DRUMS1);
+    midiSetChannelVolume(r, 127);
+    midiSetInstrument(r, 5);
+  }
+  
   delay(100);
 
   //define track info
-  track[0] = { 36, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[1] = { 40, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[2] = { 42, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[3] = { 51, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[4] = { 37, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[5] = { 76, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[6] = { 77, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[7] = { 39, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[8] = { 67, { 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[9] = { 70, { 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[0] = { 36, { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 } };
+  track[1] = { 40, { 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[2] = { 42, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[3] = { 51, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[4] = { 37, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[5] = { 76, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[6] = { 77, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[7] = { 39, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[8] = { 67, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
+  track[9] = { 70, { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1 } };
 
-  //set upper buttons
-  tft.setRotation(1);
-  tft.setTextColor(0xFFFF);  
-  tft.setTextSize(2);
-  tft.setCursor(10, 10); 
-  tft.print("BPM:");
-  tft.setCursor(60, 10); 
-  tft.print(bpm);
-  tft.setCursor(185, 10); 
-  tft.print("STOP");  
-  tft.setCursor(250, 10); 
-  tft.print("CLEAR");  
-  tft.setRotation(0);
+  showMenu();
 
   //show sequence
   showSequence();
@@ -203,9 +214,9 @@ void loop() {
     //play note
     for (uint8_t r = 0; r < ROWS+1; r++) {
       if (track[r].pattern[curstep]) {         
-        midiNoteOn(0, track[r].note, 127);
+        midiNoteOn(r, track[r].note, 127);
       } else {
-        midiNoteOff(0, track[r].note, 0);
+        midiNoteOff(r, track[r].note, 0);
       }
     }
 
@@ -237,13 +248,40 @@ void loop() {
     //Serial.print(r);
     //Serial.print(" ");
     //Serial.println(c);
-    
-    if(track[r].pattern[c]) {
-      track[r].pattern[c] = false;
-      tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
-    } else {
-      track[r].pattern[c] = true;
-      tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
+
+    if(!instrMode){
+      if(track[r].pattern[c]) {
+        track[r].pattern[c] = false;
+        tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
+      } else {
+        track[r].pattern[c] = true;
+        tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
+      }
+    }
+
+    if(instrMode){
+      uint8_t note = map(p.y, 0, tft.height(), 27, 87);
+
+//      Serial.print("track: ");
+//      Serial.print(r);
+//      Serial.print(" note: ");
+//      Serial.print(note);
+//      Serial.println();
+
+      //clear all notes before playing a new one
+      for(uint8_t i; i<=87; i++){
+        midiNoteOff(r, i, 127);
+      }
+
+      //play preview note (instrument)
+      midiNoteOn(r, note, 127);
+
+      //set note
+      track[r].note = note;
+
+      //draw rectangle for visual feedback
+      tft.fillRect(BOXSIZE*r, 0, BOXSIZE, tft.height(), 0x0000);
+      tft.fillRect(BOXSIZE*r, 0, BOXSIZE, map(note, 27, 87, 0, tft.height()), COLOR);
     }
   }
 
@@ -257,7 +295,7 @@ void loop() {
     if (p.y > 0 && p.y < 55){
       if(bpm > 30){
         bpm = bpm - 10;
-        tft.fillRect(200, 55, 40, 50, 0x0000);
+        tft.fillRect(200, 55, 30, 50, 0x0000);
         tft.setRotation(1);   
         tft.setCursor(60, 10); 
         tft.print(bpm);
@@ -269,7 +307,7 @@ void loop() {
     if (p.y > 55 && p.y < 110){
       if(bpm < 400){
         bpm = bpm + 10;
-        tft.fillRect(200, 55, 40, 50, 0x0000);
+        tft.fillRect(200, 55, 30, 50, 0x0000);
         tft.setRotation(1);   
         tft.setCursor(60, 10); 
         tft.print(bpm);
@@ -277,9 +315,39 @@ void loop() {
       }
     }
 
+    //instruments panel
+    if (p.y > 110 && p.y < 170){
+      //Serial.println("instruments");
+      if(!instrMode){      
+        power = false; 
+        instrMode = true;
+        tft.fillScreen(ILI9341_BLACK);
+        showMenu();
+  
+        for (uint8_t r = 0; r < ROWS; r++) {
+          tft.fillRect(BOXSIZE*r, 0, BOXSIZE, map(track[r].note, 27, 87, 0, tft.height()), COLOR);
+        }
+
+      } else {   
+        instrMode = false;   
+        tft.fillScreen(ILI9341_BLACK);
+        showMenu();
+        drawGrid();
+        showSequence();
+        
+      }
+    }
+    
     //power on / off
     if (p.y > 180 && p.y < 220){
       tft.fillRect(200, 175, 40, 65, 0x0000);
+
+      if(instrMode){     
+        drawGrid();
+        showSequence();
+        instrMode = false;
+      }
+      
       if(power){
         power = false;  
         tft.setRotation(1);   
@@ -302,6 +370,27 @@ void loop() {
 
   }
   
+}
+
+void showMenu(){
+  tft.setRotation(1);
+  tft.setTextColor(0xFFFF);  
+  tft.setTextSize(2);
+  tft.setCursor(10, 10); 
+  tft.print("BPM:");
+  tft.setCursor(60, 10); 
+  tft.print(bpm);
+  tft.setCursor(110, 10); 
+  tft.print("INSTR"); 
+  tft.setCursor(185, 10);
+  if(power){
+    tft.print("STOP");
+  } else {
+    tft.print("PLAY");
+  }
+  tft.setCursor(250, 10); 
+  tft.print("CLEAR");  
+  tft.setRotation(0);
 }
 
 void drawGrid(){
