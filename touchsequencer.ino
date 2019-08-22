@@ -15,10 +15,15 @@ Close the midi jumper on the bottom of the
 music featherwing and upload the sketch and
 guaranteed hours of pleasure! 
 
-05-08-2019
+22-08-2019 Rotterdam, The Netherlands
 https://jonasvorwerk.nl
 
 Changes:
+
+22-08-2019
+- Patterns added! Performance on 32u4 is not making me happy
+  but you could disable some display features line SHOWSEQUENCE, 
+  SHOWPATTERNS and SHOWGRID to improve timing
 
 09-08-2019
 - Now posible to change instuments using the INSTR button
@@ -72,8 +77,9 @@ Changes:
 #endif
 
 // Anything else!
-#if defined (__AVR_ATmega32U4__) || defined(ARDUINO_SAMD_FEATHER_M0) || defined (__AVR_ATmega328P__) || \
-    defined(ARDUINO_SAMD_ZERO) || defined(__SAMD51__) || defined(__SAM3X8E__) || defined(ARDUINO_NRF52840_FEATHER)
+#if defined (__AVR_ATmega32U4__) || defined(ARDUINO_SAMD_FEATHER_M0) || \ 
+    defined (__AVR_ATmega328P__) || defined(ARDUINO_SAMD_ZERO) || \ 
+    defined(__SAMD51__) || defined(__SAM3X8E__) || defined(ARDUINO_NRF52840_FEATHER)
    #define STMPE_CS 6
    #define TFT_CS   9
    #define TFT_DC   10
@@ -105,7 +111,8 @@ Adafruit_STMPE610 ts = Adafruit_STMPE610(STMPE_CS);
 #define MIDI_CHAN_BANK 0x00
 #define MIDI_CHAN_VOLUME 0x07
 #define MIDI_CHAN_PROGRAM 0xC0
-#if defined(__AVR_ATmega32U4__) || defined(ARDUINO_SAMD_FEATHER_M0) || defined(TEENSYDUINO) || defined(ARDUINO_STM32_FEATHER)
+#if defined(__AVR_ATmega32U4__) || defined(ARDUINO_SAMD_FEATHER_M0) || \
+defined(TEENSYDUINO) || defined(ARDUINO_STM32_FEATHER)
   #define VS1053_MIDI Serial1
 #elif defined(ESP32)
   HardwareSerial Serial1(2);
@@ -116,7 +123,7 @@ Adafruit_STMPE610 ts = Adafruit_STMPE610(STMPE_CS);
 
 //SEQUENCER LARGE
 #define COLS 16
-#define ROWS 10
+#define ROWS 8
 #define BOXSIZE 20
 #define BPMDIVIDER 4
 
@@ -130,15 +137,22 @@ Adafruit_STMPE610 ts = Adafruit_STMPE610(STMPE_CS);
 #define COLOR 0xFFFF
 #define BGCOLOR 0x0000
 #define TOUCHDELAY 150
+#define PATTR 4
+#define PATPLAY 1
+
+#define SHOWSEQUENCE 0
+#define SHOWPATTERNS 1
+#define SHOWGRID 0
 
 bool power = true;
 bool instrMode = false;
-int bpm = 100;
+int bpm = 140;
 uint8_t curstep = 0; 
+uint8_t curpattern = 0; 
 
 typedef struct trackstructure{
   uint8_t note;
-  bool pattern[COLS];
+  bool patterns[PATTR][COLS]; //one extra just to make sure it keeps working
 };
 
 trackstructure track[ROWS+1]; //one extra
@@ -164,7 +178,7 @@ void setup(void) {
 
   //enable midi
   VS1053_MIDI.begin(31250); // MIDI uses a 'strange baud rate'
-  delay(100);
+  delay(500);
   
   //separate midi channel for each track
   for (uint8_t r = 0; r < ROWS; r++) {
@@ -173,19 +187,69 @@ void setup(void) {
     midiSetInstrument(r, 5);
   }
   
-  delay(100);
+  delay(500);
 
-  //define track info
-  track[0] = { 36, { 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0 } };
-  track[1] = { 40, { 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[2] = { 42, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[3] = { 51, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[4] = { 37, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[5] = { 76, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[6] = { 77, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[7] = { 39, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[8] = { 67, { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 } };
-  track[9] = { 70, { 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 1 } };
+  //define track info note and patterns
+  //make sure you assign the same amount of patterns as your PATTR
+  
+  track[0] = { 36, {
+    { 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0 },
+    { 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0 },
+    { 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0 },
+    { 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0 },
+  }};
+  track[1] = { 40, {
+    { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0 },
+  }};
+  track[2] = { 42, {
+    { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1 },
+    { 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1 },
+    { 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1 },
+    { 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1 },
+  }};
+  track[3] = { 51, {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1 },
+    { 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0 },
+  }};
+  track[4] = { 37, {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  }};
+  track[5] = { 76, {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  }};
+  track[6] = { 77, {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  }};
+  track[7] = { 39, {
+  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  }};
+
+// default empty tracks with just notes assigned
+//  track[0] = { 36, {{}} };
+//  track[1] = { 40, {{}} };
+//  track[2] = { 42, {{}} };
+//  track[3] = { 51, {{}} };
+//  track[4] = { 37, {{}} };
+//  track[5] = { 76, {{}} };
+//  track[6] = { 77, {{}} };
+//  track[7] = { 39, {{}} };
 
   showMenu();
 
@@ -194,6 +258,11 @@ void setup(void) {
 
   //draw grid lines
   drawGrid();
+
+  //draw pattern buttons
+  drawPatterns();
+
+  delay(500);
 }
 
 void loop() {
@@ -207,13 +276,12 @@ void loop() {
     for (int c = 0; c < COLS; c = c+1) { 
       tft.drawRect(0, BOXSIZE*c, BOXSIZE*ROWS, BOXSIZE, 0x0000);
     }
-    
     //show current step inducator
     tft.drawRect(0, BOXSIZE*curstep, BOXSIZE*ROWS, BOXSIZE, 0xFFFF); 
 
     //play note
     for (uint8_t r = 0; r < ROWS+1; r++) {
-      if (track[r].pattern[curstep]) {         
+      if (track[r].patterns[curpattern][curstep]) {         
         midiNoteOn(r, track[r].note, 127);
       } else {
         midiNoteOff(r, track[r].note, 0);
@@ -222,7 +290,20 @@ void loop() {
 
     //increase step amount
     curstep++;
-    if (curstep >= COLS) curstep = 0;
+    if (curstep >= COLS) {
+      curstep = 0;
+
+      //update pattern only if there are any and if PATPLAY is enabled
+      if(PATTR > 1 && PATPLAY){
+        if(curpattern < PATTR-1){
+          curpattern++;
+        } else {
+          curpattern = 0;
+        }
+        drawPatterns();
+        showSequence();
+      }
+    }
   }
 
   //clear touchscreen buffer
@@ -250,23 +331,17 @@ void loop() {
     //Serial.println(c);
 
     if(!instrMode){
-      if(track[r].pattern[c]) {
-        track[r].pattern[c] = false;
+      if(track[r].patterns[curpattern][c]) {
+        track[r].patterns[curpattern][c] = false;
         tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
       } else {
-        track[r].pattern[c] = true;
+        track[r].patterns[curpattern][c] = true;
         tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
       }
     }
 
     if(instrMode){
       uint8_t note = map(p.y, 0, tft.height(), 27, 87);
-
-//      Serial.print("track: ");
-//      Serial.print(r);
-//      Serial.print(" note: ");
-//      Serial.print(note);
-//      Serial.println();
 
       //clear all notes before playing a new one
       for(uint8_t i; i<=87; i++){
@@ -393,23 +468,43 @@ void showMenu(){
   tft.setRotation(0);
 }
 
-void drawGrid(){
-  for (uint8_t c = 1; c < COLS; c++) { //not start at 0 because we don't need the first line
-      if (c % 4 == 0) {
-        tft.drawLine(0, BOXSIZE*c, 205, BOXSIZE*c, COLOR);
+void drawPatterns(){
+  delay(5); // smallhack to make sure the pattern is ready and the 1st notes are playing
+  if(PATTR > 1 && SHOWPATTERNS){
+    for (uint8_t p = 0; p < PATTR; p++) {
+      if(curpattern == p){
+        tft.fillRect( tft.width()-55, tft.height()/PATTR*p, BOXSIZE, tft.height()/PATTR,COLOR);
+      } else {
+        tft.fillRect( tft.width()-55, tft.height()/PATTR*p, BOXSIZE, tft.height()/PATTR,BGCOLOR);
+        //tft.drawRect( tft.width()-55, tft.height()/PATTR*p, BOXSIZE, tft.height()/PATTR,COLOR);
       }
+    }
+  }
+}
+
+void drawGrid(){
+  if(SHOWGRID){
+    for (uint8_t c = 1; c < COLS; c++) { //not start at 0 because we don't need the first line
+        if (c % 4 == 0) {
+          tft.drawLine(0, BOXSIZE*c, 205, BOXSIZE*c, COLOR);
+        }
+    }
   }
 }
 
 void showSequence(){
-  for (uint8_t r = 0; r < ROWS; r++) {     
-    for (uint8_t c = 0; c < COLS; c++) { 
-      if(track[r].pattern[c]){
-        tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
-      } else {
-        tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
+  if(SHOWSEQUENCE){
+  
+    for (uint8_t r = 0; r < ROWS; r++) {     
+      for (uint8_t c = 0; c < COLS; c++) { 
+        if(track[r].patterns[curpattern][c]){
+          tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
+        } else {
+          tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
+        }
       }
     }
+
   }
 }
 
@@ -419,7 +514,7 @@ void printSequence(){
     Serial.print(r); 
     Serial.print(" ");  
     for (uint8_t c = 0; c < COLS; c++) { 
-        Serial.print(track[r].pattern[c]);
+        Serial.print(track[r].patterns[curpattern][c]);
     }
     Serial.println(); 
   }
@@ -428,7 +523,7 @@ void printSequence(){
 void clearSequence(){
   for (uint8_t r = 0; r < ROWS; r++) {     
     for (uint8_t c = 0; c < COLS; c++) { 
-      track[r].pattern[c] = false;
+      track[r].patterns[curpattern][c] = false;
       tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
     }
   }
