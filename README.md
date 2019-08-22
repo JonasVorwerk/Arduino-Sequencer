@@ -4,7 +4,6 @@ Arduino Sequencer
 A basic plug and play step sequencer using:
 
 Music Maker FeatherWing https://www.adafruit.com/product/3357
-
 TFT FeatherWing - 2.4" 320x240 Touchscreen https://www.adafruit.com/product/3315
 
 and a Adafruit Feather 32u4 Basic Proto, but I guess any other Feather will work https://www.adafruit.com/product/2771
