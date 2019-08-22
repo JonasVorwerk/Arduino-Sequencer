@@ -12,7 +12,6 @@ music featherwing and upload the sketch and
 guaranteed hours of pleasure! 
 
 Jonas Vorwerk https://jonasvorwerk.nl
-22-08-2019 Rotterdam, The Netherlands
 
 
 Changes:
