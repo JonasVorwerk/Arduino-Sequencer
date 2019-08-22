@@ -17,10 +17,12 @@ Close the midi jumper on the bottom of the
 music featherwing and upload the sketch and
 guaranteed hours of pleasure! 
 
+Jonas Vorwerk
 22-08-2019 Rotterdam, The Netherlands
 https://jonasvorwerk.nl
 
 Changes:
+
 22-08-2019
 - Patterns added! Performance on 32u4 is not making me happy
   but you could disable some display features line SHOWSEQUENCE, 
@@ -30,3 +32,6 @@ Changes:
 - Now posible to change instuments using the INSTR button
 - Change Sequencer size
 - Separate midi channel for each track
+
+05-08-2019
+- initial release
