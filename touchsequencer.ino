@@ -7,7 +7,7 @@ https://www.adafruit.com/product/3357
 TFT FeatherWing - 2.4" 320x240 Touchscreen 
 https://www.adafruit.com/product/3315
 
-and a Adafruit Feather 32u4 Basic Proto, 
+Feather 32u4 Basic Proto, 
 but I guess any other Feather will work
 https://www.adafruit.com/product/2771
 
@@ -15,10 +15,12 @@ Close the midi jumper on the bottom of the
 music featherwing and upload the sketch and
 guaranteed hours of pleasure! 
 
-22-08-2019 Rotterdam, The Netherlands
-https://jonasvorwerk.nl
+23-08-2019 https://jonasvorwerk.nl
 
 Changes:
+
+23-08-2019
+- Pattern display optimised, now runs smoother playing rhythms
 
 22-08-2019
 - Patterns added! Performance on 32u4 is not making me happy
@@ -140,7 +142,7 @@ defined(TEENSYDUINO) || defined(ARDUINO_STM32_FEATHER)
 #define PATTR 4
 #define PATPLAY 1
 
-#define SHOWSEQUENCE 0
+#define SHOWSEQUENCE 1
 #define SHOWPATTERNS 1
 #define SHOWGRID 0
 
@@ -178,7 +180,7 @@ void setup(void) {
 
   //enable midi
   VS1053_MIDI.begin(31250); // MIDI uses a 'strange baud rate'
-  delay(500);
+  delay(100);
   
   //separate midi channel for each track
   for (uint8_t r = 0; r < ROWS; r++) {
@@ -187,7 +189,7 @@ void setup(void) {
     midiSetInstrument(r, 5);
   }
   
-  delay(500);
+  delay(100);
 
   //define track info note and patterns
   //make sure you assign the same amount of patterns as your PATTR
@@ -222,23 +224,23 @@ void setup(void) {
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   }};
-  track[5] = { 76, {
+  track[5] = { 38, {
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   }};
-  track[6] = { 77, {
+  track[6] = { 75, {
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
   }};
-  track[7] = { 39, {
-  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+  track[7] = { 76, {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 },
+    { 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 },
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0 },
   }};
 
 // default empty tracks with just notes assigned
@@ -254,7 +256,8 @@ void setup(void) {
   showMenu();
 
   //show sequence
-  showSequence();
+  showSequence(true);
+  //showFirstSequence();
 
   //draw grid lines
   drawGrid();
@@ -301,7 +304,7 @@ void loop() {
           curpattern = 0;
         }
         drawPatterns();
-        showSequence();
+        showSequence(false);
       }
     }
   }
@@ -325,11 +328,6 @@ void loop() {
     uint8_t r = int(p.x)/BOXSIZE;
     uint8_t c = int(p.y)/BOXSIZE;
 
-    //output touched square
-    //Serial.print(r);
-    //Serial.print(" ");
-    //Serial.println(c);
-
     if(!instrMode){
       if(track[r].patterns[curpattern][c]) {
         track[r].patterns[curpattern][c] = false;
@@ -338,10 +336,15 @@ void loop() {
         track[r].patterns[curpattern][c] = true;
         tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
       }
-    }
-
-    if(instrMode){
+    } else {
+      //set note (for drumkit its the instument)
       uint8_t note = map(p.y, 0, tft.height(), 27, 87);
+
+      Serial.print("track:");
+      Serial.print(r);
+      Serial.print(" ");
+      Serial.print("note:");
+      Serial.println(note);
 
       //clear all notes before playing a new one
       for(uint8_t i; i<=87; i++){
@@ -392,24 +395,25 @@ void loop() {
 
     //instruments panel
     if (p.y > 110 && p.y < 170){
-      //Serial.println("instruments");
-      if(!instrMode){      
+      
+      if(!instrMode){  
+            
         power = false; 
         instrMode = true;
         tft.fillScreen(ILI9341_BLACK);
         showMenu();
-  
         for (uint8_t r = 0; r < ROWS; r++) {
           tft.fillRect(BOXSIZE*r, 0, BOXSIZE, map(track[r].note, 27, 87, 0, tft.height()), COLOR);
         }
 
-      } else {   
+      } else {  
+         
         instrMode = false;   
         tft.fillScreen(ILI9341_BLACK);
         showMenu();
         drawGrid();
-        showSequence();
-        
+        showSequence(true);
+              
       }
     }
     
@@ -419,7 +423,7 @@ void loop() {
 
       if(instrMode){     
         drawGrid();
-        showSequence();
+        showSequence(true);
         instrMode = false;
       }
       
@@ -469,7 +473,7 @@ void showMenu(){
 }
 
 void drawPatterns(){
-  delay(5); // smallhack to make sure the pattern is ready and the 1st notes are playing
+  //delay(100); // small hack to make sure the pattern is ready and the 1st notes are playing
   if(PATTR > 1 && SHOWPATTERNS){
     for (uint8_t p = 0; p < PATTR; p++) {
       if(curpattern == p){
@@ -492,31 +496,30 @@ void drawGrid(){
   }
 }
 
-void showSequence(){
+void showSequence(bool redrawAll){
+
+  int prevpattern = curpattern -1;
+  if(prevpattern < 0) prevpattern = PATTR-1;
+        
   if(SHOWSEQUENCE){
   
     for (uint8_t r = 0; r < ROWS; r++) {     
       for (uint8_t c = 0; c < COLS; c++) { 
-        if(track[r].patterns[curpattern][c]){
-          tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
-        } else {
-          tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
-        }
+
+        //only change if different so the screen doesn't take to long to opdate
+        if(track[r].patterns[prevpattern][c] != track[r].patterns[curpattern][c] || redrawAll){  
+               
+          if(track[r].patterns[curpattern][c]){
+            tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, COLOR);
+          } else {
+            tft.fillRect(BOXSIZE*r, BOXSIZE*c, BOXSIZE, BOXSIZE, BGCOLOR);
+          }
+          
+        } 
+         
       }
     }
-
-  }
-}
-
-void printSequence(){
-  for (uint8_t r = 0; r < ROWS; r++) {  
-    Serial.print("track: "); 
-    Serial.print(r); 
-    Serial.print(" ");  
-    for (uint8_t c = 0; c < COLS; c++) { 
-        Serial.print(track[r].patterns[curpattern][c]);
-    }
-    Serial.println(); 
+    
   }
 }
 
@@ -539,7 +542,6 @@ void midiSetInstrument(uint8_t chan, uint8_t inst) {
   VS1053_MIDI.write(inst);
   delay(10);
 }
-
 
 void midiSetChannelVolume(uint8_t chan, uint8_t vol) {
   if (chan > 15) return;
